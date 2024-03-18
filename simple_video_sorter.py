@@ -9,6 +9,8 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 import time
 import video_sorter_keybinding as keybind  # Import keybinding configuration
 
+##################
+
 class VideoPlayer(QWidget):
     def __init__(self, video_folder_path):
         super().__init__()
