@@ -9,8 +9,6 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 import time
 import video_sorter_keybinding as keybind  # Import keybinding configuration
 
-##################
-
 class VideoPlayer(QWidget):
     def __init__(self, video_folder_path):
         super().__init__()
@@ -140,8 +138,10 @@ class VideoPlayer(QWidget):
 
     def sort_video(self, seizure_type):
         if self.current_video_index < len(self.video_files):
-            # Ensure the player is stopped and the file is released before moving it
+            # Ensure the player is stopped
             self.player.stop()
+            # Explicitly unload the media from the player
+            self.player.setMedia(QMediaContent())
             QApplication.processEvents()  # Process any pending events to ensure the file is released
 
             source = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
@@ -151,14 +151,15 @@ class VideoPlayer(QWidget):
                 destination = self.minor_seizure_path
             elif seizure_type == "nonsleeping": 
                 destination = self.nonsleeping_path
-            elif seizure_type == "exclude":  # Condition for excluding videos
+            elif seizure_type == "exclude":
                 destination = self.exclude_path
             else:
                 destination = self.nonseizure_path
             
             try:
+                # Attempt to move the file
                 shutil.move(source, destination)
-                self.sorted_video_paths.append((source, destination))  # Store the source and destination paths
+                self.sorted_video_paths.append((source, destination))
                 
                 # Remove the sorted video from the list and adjust the index accordingly
                 del self.video_files[self.current_video_index]
