@@ -138,6 +138,10 @@ class VideoPlayer(QWidget):
 
     def sort_video(self, seizure_type):
         if self.current_video_index < len(self.video_files):
+            # Ensure the player is stopped and the file is released before moving it
+            self.player.stop()
+            QApplication.processEvents()  # Process any pending events to ensure the file is released
+
             source = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
             if seizure_type == "major":
                 destination = self.major_seizure_path
@@ -149,17 +153,22 @@ class VideoPlayer(QWidget):
                 destination = self.exclude_path
             else:
                 destination = self.nonseizure_path
-            shutil.move(source, destination)
-            self.sorted_video_paths.append((source, destination))  # Store the source and destination paths
             
-            # Remove the sorted video from the list and adjust the index accordingly
-            del self.video_files[self.current_video_index]
-            
-            if self.current_video_index < len(self.video_files):
-                self.load_video()
-            else:
-                QMessageBox.information(self, "Done", "No more videos to sort.")
-                self.close()
+            try:
+                shutil.move(source, destination)
+                self.sorted_video_paths.append((source, destination))  # Store the source and destination paths
+                
+                # Remove the sorted video from the list and adjust the index accordingly
+                del self.video_files[self.current_video_index]
+                
+                if self.current_video_index < len(self.video_files):
+                    # Wait a bit before loading the next video to ensure the file system has updated
+                    QTimer.singleShot(100, self.load_video)
+                else:
+                    QMessageBox.information(self, "Done", "No more videos to sort.")
+                    self.close()
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to move file: {e}")
 
     def unsort_video(self):
         if self.sorted_video_paths:
