@@ -11,6 +11,8 @@ just add "folder_name":"keybinding" to the dictionary.
 Tip: Use capital letters, and special keys (shift, enter, etc) are not recommended
 """
 
+unsorted_path = "/Users/thomasunderwood/Desktop/GitHub/videosorter/unsorted"
+
 # Remap but DO NOT ADD/DELETE
 core_buttons = {
     "play_pause": "Space",

@@ -1,31 +1,76 @@
 import sys
 import os
 import shutil
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QMessageBox
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer, QUrl, Qt
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QMessageBox, QLineEdit, QFormLayout, QDialog, QDialogButtonBox)
+from PyQt5.QtCore import QTimer, QUrl
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 import time
-import video_sorter_keybinding as keybind  # Import keybinding configuration
+
+class KeybindingConfigurator(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Configure Keybindings and Folders")
+        self.layout = QVBoxLayout()
+        
+        self.formLayout = QFormLayout()
+        self.core_buttons = {
+            'play_pause': QLineEdit('Space'),
+            'restart': QLineEdit('R'),
+            'unsort': QLineEdit('U')
+        }
+        
+        for action, lineEdit in self.core_buttons.items():
+            self.formLayout.addRow(f"{action.replace('_', ' ').title()}: ", lineEdit)
+        
+        self.folderMappingsLayout = QVBoxLayout()
+        self.folderMappings = []
+        self.addFolderMappingButton = QPushButton("Add Folder Mapping")
+        self.addFolderMappingButton.clicked.connect(self.addFolderMapping)
+        
+        self.layout.addLayout(self.formLayout)
+        self.layout.addLayout(self.folderMappingsLayout)
+        self.layout.addWidget(self.addFolderMappingButton)
+        
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+        
+        self.setLayout(self.layout)
+    
+    def addFolderMapping(self):
+        folderLineEdit = QLineEdit()
+        keyLineEdit = QLineEdit()
+        mappingLayout = QFormLayout()
+        mappingLayout.addRow("Folder Name: ", folderLineEdit)
+        mappingLayout.addRow("Key: ", keyLineEdit)
+        self.folderMappingsLayout.addLayout(mappingLayout)
+        self.folderMappings.append((folderLineEdit, keyLineEdit))
+    
+    def getConfig(self):
+        core_buttons = {action: le.text() for action, le in self.core_buttons.items()}
+        folders_to_sort = {folder.text(): key.text() for folder, key in self.folderMappings}
+        return core_buttons, folders_to_sort
 
 class VideoPlayer(QWidget):
-    def __init__(self, video_folder_path):
+    def __init__(self, video_folder_path, core_buttons, folders_to_sort):
         super().__init__()
         self.video_folder_path = video_folder_path
-        self.folder_paths = {}  # Dictionary to hold folder paths
+        self.core_buttons = core_buttons
+        self.folders_to_sort = folders_to_sort
+        self.folder_paths = {}
         self.current_video_index = 0
         self.video_files = self.get_video_files()
-        self.sorted_video_paths = []  # Store paths of sorted videos
+        self.sorted_video_paths = []
         
-        # Initialize the video widget and layout before calling initUI
         self.layout = QVBoxLayout()
-        self.videoWidget = QVideoWidget()  # Initialize the video widget here
+        self.videoWidget = QVideoWidget()
         
         self.initUI()
         
-        self.player = QMediaPlayer(self)  # Use QMediaPlayer for media playback
-        self.player.setVideoOutput(self.videoWidget)  # Set the video output to the video widget
+        self.player = QMediaPlayer(self)
+        self.player.setVideoOutput(self.videoWidget)
         self.isPlaying = False
 
     def ensure_folder_exists(self, folder_name):
@@ -35,7 +80,7 @@ class VideoPlayer(QWidget):
         return path
 
     def get_video_files(self):
-        supported_video_formats = ['.mp4', '.avi', '.mov']  # Add or remove video formats as needed
+        supported_video_formats = ['.mp4', '.avi', '.mov']
         video_files = [f for f in os.listdir(self.video_folder_path) if os.path.isfile(os.path.join(self.video_folder_path, f)) and os.path.splitext(f)[1].lower() in supported_video_formats]
         return video_files
 
@@ -45,23 +90,19 @@ class VideoPlayer(QWidget):
         self.videoPathLabel = QLabel("Click play to start sorting")
         self.layout.addWidget(self.videoPathLabel)
 
-        # Initialize Play/Pause button with key binding in label
-        self.playPauseButton = QPushButton(f"Play/Pause ({keybind.core_buttons['play_pause']})")
+        self.playPauseButton = QPushButton(f"Play/Pause ({self.core_buttons['play_pause']})")
         self.playPauseButton.clicked.connect(self.toggle_play_pause)
         self.layout.addWidget(self.playPauseButton)
 
-        # Initialize Restart button with key binding in label
-        self.restartButton = QPushButton(f"Restart ({keybind.core_buttons['restart']})")
+        self.restartButton = QPushButton(f"Restart ({self.core_buttons['restart']})")
         self.restartButton.clicked.connect(self.replay_video)
         self.layout.addWidget(self.restartButton)
 
-        # Initialize Unsort button with key binding in label
-        self.unsortButton = QPushButton(f"Unsort ({keybind.core_buttons['unsort']})")
+        self.unsortButton = QPushButton(f"Unsort ({self.core_buttons['unsort']})")
         self.unsortButton.clicked.connect(self.unsort_video)
         self.layout.addWidget(self.unsortButton)
 
-        # Dynamically create buttons for sorting into folders
-        for folder_name, key in keybind.folders_to_sort.items():
+        for folder_name, key in self.folders_to_sort.items():
             folder_path = self.ensure_folder_exists(folder_name.replace("_", " ").title())
             self.folder_paths[folder_name] = folder_path
             button = QPushButton(f"{folder_name.replace('_', ' ').title()} ({key})")
@@ -71,20 +112,20 @@ class VideoPlayer(QWidget):
         self.setLayout(self.layout)
 
     def keyPressEvent(self, event):
-        key_mappings = {**keybind.core_buttons, **keybind.folders_to_sort}
+        key_mappings = {**self.core_buttons, **self.folders_to_sort}
         reverse_mappings = {v: k for k, v in key_mappings.items()}
         key_pressed = event.text().upper()
 
         if key_pressed in reverse_mappings:
             action = reverse_mappings[key_pressed]
-            if action in keybind.core_buttons:
+            if action in self.core_buttons:
                 if action == "play_pause":
                     self.toggle_play_pause()
                 elif action == "restart":
                     self.replay_video()
                 elif action == "unsort":
                     self.unsort_video()
-            elif action in keybind.folders_to_sort:
+            elif action in self.folders_to_sort:
                 self.sort_video(action)
         else:
             super().keyPressEvent(event)
@@ -164,18 +205,26 @@ class VideoPlayer(QWidget):
 
 def ask_paths():
     app = QApplication(sys.argv)
+    
+    keybindingConfigurator = KeybindingConfigurator()
+    if keybindingConfigurator.exec_() == QDialog.Accepted:
+        core_buttons, folders_to_sort = keybindingConfigurator.getConfig()
+    else:
+        QMessageBox.warning(None, "Error", "Keybindings and folder mappings configuration cancelled.")
+        sys.exit()
+    
     video_folder_path = QFileDialog.getExistingDirectory(None, "Select Unsorted Video Folder")
     if video_folder_path:
-        return video_folder_path
+        return video_folder_path, core_buttons, folders_to_sort
     else:
         QMessageBox.warning(None, "Error", "Please select the path for unsorted videos.")
         sys.exit()
 
 if __name__ == "__main__":
-    video_folder_path = ask_paths()
+    video_folder_path, core_buttons, folders_to_sort = ask_paths()
     if video_folder_path:
         app = QApplication(sys.argv)
-        ex = VideoPlayer(video_folder_path)
+        ex = VideoPlayer(video_folder_path, core_buttons, folders_to_sort)
         ex.show()
         sys.exit(app.exec_())
     else:
