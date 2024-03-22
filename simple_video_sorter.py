@@ -13,11 +13,7 @@ class VideoPlayer(QWidget):
     def __init__(self, video_folder_path):
         super().__init__()
         self.video_folder_path = video_folder_path
-        self.major_seizure_path = self.ensure_folder_exists("Major_Seizure")
-        self.minor_seizure_path = self.ensure_folder_exists("Minor_Seizure")
-        self.nonseizure_path = self.ensure_folder_exists("Night_Nonseizure")
-        self.nonsleeping_path = self.ensure_folder_exists("Day_Nonsleeping")
-        self.exclude_path = self.ensure_folder_exists("Exclude")  # New folder/path for excluded videos
+        self.folder_paths = {}  # Dictionary to hold folder paths
         self.current_video_index = 0
         self.video_files = self.get_video_files()
         self.sorted_video_paths = []  # Store paths of sorted videos
@@ -25,7 +21,6 @@ class VideoPlayer(QWidget):
         # Initialize the video widget and layout before calling initUI
         self.layout = QVBoxLayout()
         self.videoWidget = QVideoWidget()  # Initialize the video widget here
-        #self.videoWidget.setMinimumSize(640, 480)  # Set minimum size (width, height)
         
         self.initUI()
         
@@ -46,78 +41,56 @@ class VideoPlayer(QWidget):
 
     def initUI(self):
         self.setWindowTitle("Video Sorter")
-        
-        # Now self.layout and self.videoWidget are already initialized
         self.layout.addWidget(self.videoWidget)
-
-        # Display video path label
-        self.videoPathLabel = QLabel("Video Path: None")
+        self.videoPathLabel = QLabel("Click play to start sorting")
         self.layout.addWidget(self.videoPathLabel)
 
         # Initialize Play/Pause button with key binding in label
-        self.playPauseButton = QPushButton(f"Play ({keybind.play_pause})")
+        self.playPauseButton = QPushButton(f"Play/Pause ({keybind.core_buttons['play_pause']})")
         self.playPauseButton.clicked.connect(self.toggle_play_pause)
         self.layout.addWidget(self.playPauseButton)
 
-        # Add Replay button with key binding in label
-        self.replayButton = QPushButton(f"Restart ({keybind.restart})")
-        self.replayButton.clicked.connect(self.replay_video)
-        self.layout.addWidget(self.replayButton)
+        # Initialize Restart button with key binding in label
+        self.restartButton = QPushButton(f"Restart ({keybind.core_buttons['restart']})")
+        self.restartButton.clicked.connect(self.replay_video)
+        self.layout.addWidget(self.restartButton)
 
-        # Add Major Seizure Folder button with key binding in label
-        self.majorSeizureButton = QPushButton(f"Major Seizure Folder ({keybind.major_seizure})")
-        self.majorSeizureButton.clicked.connect(lambda: self.sort_video("major"))
-        self.layout.addWidget(self.majorSeizureButton)
-
-        # Add Minor Seizure Folder button with key binding in label
-        self.minorSeizureButton = QPushButton(f"Minor Seizure Folder ({keybind.minor_seizure})")
-        self.minorSeizureButton.clicked.connect(lambda: self.sort_video("minor"))
-        self.layout.addWidget(self.minorSeizureButton)
-
-        # Modify Non-Seizure Folder button to "Night - Nonseizure" with key binding in label
-        self.nonSeizureButton = QPushButton(f"Night - Nonseizure ({keybind.night_nonseizure})")
-        self.nonSeizureButton.clicked.connect(lambda: self.sort_video("nonseizure"))
-        self.layout.addWidget(self.nonSeizureButton)
-
-        # Add Day - Nonsleeping Folder button with key binding in label
-        self.nonsleepingButton = QPushButton(f"Day - Nonsleeping ({keybind.day_nonsleeping})")
-        self.nonsleepingButton.clicked.connect(lambda: self.sort_video("nonsleeping"))
-        self.layout.addWidget(self.nonsleepingButton)
-
-        # Add Exclude button with key binding in label
-        self.excludeButton = QPushButton(f"Exclude ({keybind.exclude})")
-        self.excludeButton.clicked.connect(lambda: self.sort_video("exclude"))
-        self.layout.addWidget(self.excludeButton)  # New button for excluding videos
-
-        # Add Unsort button with key binding in label
-        self.unsortButton = QPushButton(f"Unsort ({keybind.unsort})")
+        # Initialize Unsort button with key binding in label
+        self.unsortButton = QPushButton(f"Unsort ({keybind.core_buttons['unsort']})")
         self.unsortButton.clicked.connect(self.unsort_video)
         self.layout.addWidget(self.unsortButton)
 
-        # Set the layout
+        # Dynamically create buttons for sorting into folders
+        for folder_name, key in keybind.folders_to_sort.items():
+            folder_path = self.ensure_folder_exists(folder_name.replace("_", " ").title())
+            self.folder_paths[folder_name] = folder_path
+            button = QPushButton(f"{folder_name.replace('_', ' ').title()} ({key})")
+            button.clicked.connect(lambda checked, fn=folder_name: self.sort_video(fn))
+            self.layout.addWidget(button)
+
         self.setLayout(self.layout)
 
     def keyPressEvent(self, event):
-        if event.key() == getattr(Qt, f"Key_{keybind.major_seizure}"):
-            self.sort_video("major")
-        elif event.key() == getattr(Qt, f"Key_{keybind.minor_seizure}"):
-            self.sort_video("minor")
-        elif event.key() == getattr(Qt, f"Key_{keybind.night_nonseizure}"):
-            self.sort_video("nonseizure")
-        elif event.key() == getattr(Qt, f"Key_{keybind.day_nonsleeping}"):
-            self.sort_video("nonsleeping")
-        elif event.key() == getattr(Qt, f"Key_{keybind.exclude}"):
-            self.sort_video("exclude")
-        elif event.key() == getattr(Qt, f"Key_{keybind.play_pause}"):
-            self.toggle_play_pause()
-        elif event.key() == getattr(Qt, f"Key_{keybind.restart}"):
-            self.replay_video()
-        elif event.key() == getattr(Qt, f"Key_{keybind.unsort}"):
-            self.unsort_video()
+        key_mappings = {**keybind.core_buttons, **keybind.folders_to_sort}
+        reverse_mappings = {v: k for k, v in key_mappings.items()}
+        key_pressed = event.text().upper()
+
+        if key_pressed in reverse_mappings:
+            action = reverse_mappings[key_pressed]
+            if action in keybind.core_buttons:
+                if action == "play_pause":
+                    self.toggle_play_pause()
+                elif action == "restart":
+                    self.replay_video()
+                elif action == "unsort":
+                    self.unsort_video()
+            elif action in keybind.folders_to_sort:
+                self.sort_video(action)
         else:
-            super().keyPressEvent(event)  # Call the base class method to handle other key presses
+            super().keyPressEvent(event)
+
     def toggle_play_pause(self):
-        if self.isPlaying:
+        if self.player.state() == QMediaPlayer.PlayingState:
             self.player.pause()
             self.playPauseButton.setText("Play")
         else:
@@ -136,8 +109,8 @@ class VideoPlayer(QWidget):
         self.player.play()  # Start playback
         self.isPlaying = True
 
-    def sort_video(self, seizure_type):
-        if self.current_video_index < len(self.video_files):
+    def sort_video(self, folder_name):
+        if self.current_video_index < len(self.video_files) and self.isPlaying:
             # Ensure the player is stopped
             self.player.stop()
             # Explicitly unload the media from the player
@@ -145,18 +118,9 @@ class VideoPlayer(QWidget):
             QApplication.processEvents()  # Process any pending events to ensure the file is released
 
             source = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
-            if seizure_type == "major":
-                destination = self.major_seizure_path
-            elif seizure_type == "minor":
-                destination = self.minor_seizure_path
-            elif seizure_type == "nonsleeping": 
-                destination = self.nonsleeping_path
-            elif seizure_type == "exclude":
-                destination = self.exclude_path
-            else:
-                destination = self.nonseizure_path
+            destination = self.folder_paths[folder_name]
             
-            try:
+            try: 
                 # Attempt to move the file
                 shutil.move(source, destination)
                 self.sorted_video_paths.append((source, destination))
@@ -172,6 +136,8 @@ class VideoPlayer(QWidget):
                     self.close()
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to move file: {e}")
+        else:
+            QMessageBox.warning(self, "Error", "You must play the video before sorting it.")
 
     def unsort_video(self):
         if self.sorted_video_paths:
@@ -195,7 +161,6 @@ class VideoPlayer(QWidget):
         if not self.isPlaying:
             self.player.play()
             self.isPlaying = True
-    # Methods toggle_play_pause, load_video, sort_video, unsort_video, and replay_video remain unchanged
 
 def ask_paths():
     app = QApplication(sys.argv)
@@ -215,4 +180,3 @@ if __name__ == "__main__":
         sys.exit(app.exec_())
     else:
         QMessageBox.warning(None, "Error", "Please select the path for unsorted videos.")
-
