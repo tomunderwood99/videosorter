@@ -2,12 +2,20 @@ import sys
 import os
 import shutil
 import ast
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QMessageBox, QLineEdit, QFormLayout, QDialog, QDialogButtonBox, QCheckBox, QSizePolicy)
 from PyQt5.QtCore import QTimer, QUrl, Qt
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-import time
-from video_sorter_keybinding import core_buttons as imported_core_buttons, folders_to_sort as imported_folders_to_sort, unsorted_path as imported_unsorted_path
+
+# Function to dynamically load the configuration
+def load_config():
+    exe_dir = os.path.dirname(sys.executable)
+    config_path = os.path.join(exe_dir, 'video_sorter_keybinding.py')
+    spec = importlib.util.spec_from_file_location("video_sorter_keybinding", config_path)
+    video_sorter_keybinding = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(video_sorter_keybinding)
+    return video_sorter_keybinding
 
 class KeybindingConfigurator(QDialog):
     def __init__(self):
@@ -25,7 +33,6 @@ class KeybindingConfigurator(QDialog):
         for action, lineEdit in self.core_buttons.items():
             self.formLayout.addRow(f"{action.replace('_', ' ').title()}: ", lineEdit)
         
-        # Add video folder path input
         self.videoFolderPathLineEdit = QLineEdit()
         self.formLayout.addRow("Video Folder Path: ", self.videoFolderPathLineEdit)
         
@@ -41,7 +48,6 @@ class KeybindingConfigurator(QDialog):
         self.useDefaultCheckbox = QCheckBox("Use saved keybindings and video path")
         self.layout.addWidget(self.useDefaultCheckbox)
         
-        # Checkbox for saving settings
         self.saveSettingsCheckbox = QCheckBox("Save these settings as default")
         self.layout.addWidget(self.saveSettingsCheckbox)
         
@@ -63,9 +69,10 @@ class KeybindingConfigurator(QDialog):
     
     def getConfig(self):
         if self.useDefaultCheckbox.isChecked():
-            core_buttons = imported_core_buttons
-            folders_to_sort = imported_folders_to_sort
-            video_folder_path = imported_unsorted_path
+            video_sorter_keybinding = load_config()
+            core_buttons = video_sorter_keybinding.core_buttons
+            folders_to_sort = video_sorter_keybinding.folders_to_sort
+            video_folder_path = video_sorter_keybinding.unsorted_path
         else:
             core_buttons = {action: le.text() for action, le in self.core_buttons.items()}
             folders_to_sort = {folder.text(): key.text() for folder, key in self.folderMappings}
@@ -90,7 +97,9 @@ core_buttons = {ast.literal_eval(repr(core_buttons))}
 
 folders_to_sort = {ast.literal_eval(repr(folders_to_sort))}
 """
-        with open('video_sorter_keybinding.py', 'w') as file:
+        exe_dir = os.path.dirname(sys.executable)
+        config_path = os.path.join(exe_dir, 'video_sorter_keybinding.py')
+        with open(config_path, 'w') as file:
             file.write(settings_content)
 
 class VideoPlayer(QWidget):
@@ -197,7 +206,6 @@ class VideoPlayer(QWidget):
 
     def load_video(self):
         video_path = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
-        print(video_path)
         self.videoPathLabel.setText(f"Video Path: {video_path}")  # Update video path label
         self.player.setMedia(QMediaContent(QUrl.fromLocalFile(video_path)))
         self.player.play()  # Start playback
@@ -241,7 +249,6 @@ class VideoPlayer(QWidget):
             shutil.move(destination_file_path, original_source)  # Move it back to the original folder
             self.video_files.insert(self.current_video_index, video_file_name)  # Reinsert the video file name into the list
             self.current_video_index = max(0, self.current_video_index - 1)  # Update the video index
-            time.sleep(0.1)  # Pause for 0.1 second
             self.load_video()  # Replay the unsorted video
             self.isPlaying = False  # Assume video is not playing after unsorting
         else:
