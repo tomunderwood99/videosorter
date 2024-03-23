@@ -1,3 +1,9 @@
+# May need to install GStreamer on Mac/Linux 
+# or K-Lite Codec Pack on Windows
+
+# to run as a script, create conda env with pyqt installed
+# seems to work best on Python 3.12.0
+
 import sys
 import os
 import shutil
@@ -10,8 +16,23 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 # Function to dynamically load the configuration
 def load_config():
+    # First, try to load the configuration from the executable's directory
     exe_dir = os.path.dirname(sys.executable)
-    config_path = os.path.join(exe_dir, 'video_sorter_keybinding.py')
+    config_path_exe = os.path.join(exe_dir, 'video_sorter_keybinding.py')
+    
+    # Then, define the path in the current working directory
+    cwd = os.getcwd()
+    config_path_cwd = os.path.join(cwd, 'video_sorter_keybinding.py')
+    
+    # Check if the config exists in the executable's directory
+    if os.path.exists(config_path_exe):
+        config_path = config_path_exe
+    elif os.path.exists(config_path_cwd):
+        # If not, fall back to the current working directory
+        config_path = config_path_cwd
+    else:
+        raise FileNotFoundError("video_sorter_keybinding.py not found in either the executable's directory or the current working directory.")
+    
     spec = importlib.util.spec_from_file_location("video_sorter_keybinding", config_path)
     video_sorter_keybinding = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(video_sorter_keybinding)
