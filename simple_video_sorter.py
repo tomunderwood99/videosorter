@@ -1,16 +1,17 @@
 import sys
 import os
 import shutil
-from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QMessageBox, QLineEdit, QFormLayout, QDialog, QDialogButtonBox)
-from PyQt5.QtCore import QTimer, QUrl
+from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QMessageBox, QLineEdit, QFormLayout, QDialog, QDialogButtonBox, QCheckBox)
+from PyQt5.QtCore import QTimer, QUrl, Qt
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 import time
+from video_sorter_keybinding import core_buttons as imported_core_buttons, folders_to_sort as imported_folders_to_sort, unsorted_path as imported_unsorted_path
 
 class KeybindingConfigurator(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Configure Keybindings and Folders")
+        self.setWindowTitle("Configure Keybindings, Folders, and Video Path")
         self.layout = QVBoxLayout()
         
         self.formLayout = QFormLayout()
@@ -23,6 +24,10 @@ class KeybindingConfigurator(QDialog):
         for action, lineEdit in self.core_buttons.items():
             self.formLayout.addRow(f"{action.replace('_', ' ').title()}: ", lineEdit)
         
+        # Add video folder path input
+        self.videoFolderPathLineEdit = QLineEdit()
+        self.formLayout.addRow("Video Folder Path: ", self.videoFolderPathLineEdit)
+        
         self.folderMappingsLayout = QVBoxLayout()
         self.folderMappings = []
         self.addFolderMappingButton = QPushButton("Add Folder Mapping")
@@ -31,6 +36,9 @@ class KeybindingConfigurator(QDialog):
         self.layout.addLayout(self.formLayout)
         self.layout.addLayout(self.folderMappingsLayout)
         self.layout.addWidget(self.addFolderMappingButton)
+        
+        self.useDefaultCheckbox = QCheckBox("Use default keybindings and video path")
+        self.layout.addWidget(self.useDefaultCheckbox)
         
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttons.accepted.connect(self.accept)
@@ -49,9 +57,15 @@ class KeybindingConfigurator(QDialog):
         self.folderMappings.append((folderLineEdit, keyLineEdit))
     
     def getConfig(self):
-        core_buttons = {action: le.text() for action, le in self.core_buttons.items()}
-        folders_to_sort = {folder.text(): key.text() for folder, key in self.folderMappings}
-        return core_buttons, folders_to_sort
+        if self.useDefaultCheckbox.isChecked():
+            core_buttons = imported_core_buttons
+            folders_to_sort = imported_folders_to_sort
+            video_folder_path = imported_unsorted_path
+        else:
+            core_buttons = {action: le.text() for action, le in self.core_buttons.items()}
+            folders_to_sort = {folder.text(): key.text() for folder, key in self.folderMappings}
+            video_folder_path = self.videoFolderPathLineEdit.text()
+        return video_folder_path, core_buttons, folders_to_sort
 
 class VideoPlayer(QWidget):
     def __init__(self, video_folder_path, core_buttons, folders_to_sort):
@@ -114,6 +128,12 @@ class VideoPlayer(QWidget):
     def keyPressEvent(self, event):
         key_mappings = {**self.core_buttons, **self.folders_to_sort}
         reverse_mappings = {v: k for k, v in key_mappings.items()}
+        
+        # Handle space key separately
+        if event.key() == Qt.Key_Space:
+            self.toggle_play_pause()
+            return
+
         key_pressed = event.text().upper()
 
         if key_pressed in reverse_mappings:
@@ -134,13 +154,14 @@ class VideoPlayer(QWidget):
         if self.player.state() == QMediaPlayer.PlayingState:
             self.player.pause()
             self.playPauseButton.setText("Play")
+            self.isPlaying = False  # Explicitly set to False when paused
         else:
             if self.player.state() == QMediaPlayer.StoppedState and self.current_video_index < len(self.video_files):
                 self.load_video()
             else:
                 self.player.play()
-            self.playPauseButton.setText("Pause")
-        self.isPlaying = not self.isPlaying
+                self.playPauseButton.setText("Pause")
+            self.isPlaying = True  # Explicitly set to True when playing
 
     def load_video(self):
         video_path = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
@@ -148,16 +169,12 @@ class VideoPlayer(QWidget):
         self.videoPathLabel.setText(f"Video Path: {video_path}")  # Update video path label
         self.player.setMedia(QMediaContent(QUrl.fromLocalFile(video_path)))
         self.player.play()  # Start playback
-        self.isPlaying = True
+        self.isPlaying = True  # Ensure isPlaying reflects the current state
 
     def sort_video(self, folder_name):
-        if self.current_video_index < len(self.video_files) and self.isPlaying:
-            # Ensure the player is stopped
+        if self.current_video_index < len(self.video_files) and (self.isPlaying or self.player.state() == QMediaPlayer.PausedState):
             self.player.stop()
-            # Explicitly unload the media from the player
-            self.player.setMedia(QMediaContent())
-            QApplication.processEvents()  # Process any pending events to ensure the file is released
-
+            self.isPlaying = False  # Update isPlaying since the video will stop
             source = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
             destination = self.folder_paths[folder_name]
             
@@ -178,7 +195,7 @@ class VideoPlayer(QWidget):
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to move file: {e}")
         else:
-            QMessageBox.warning(self, "Error", "You must play the video before sorting it.")
+            QMessageBox.warning(self, "Error", f"You must play the video before sorting it. Current state: {self.player.state()}, Is Playing: {self.isPlaying}, Condition: {(self.isPlaying or self.player.state() == QMediaPlayer.PausedState)}")
 
     def unsort_video(self):
         if self.sorted_video_paths:
@@ -194,6 +211,7 @@ class VideoPlayer(QWidget):
             self.current_video_index = max(0, self.current_video_index - 1)  # Update the video index
             time.sleep(0.1)  # Pause for 0.1 second
             self.load_video()  # Replay the unsorted video
+            self.isPlaying = False  # Assume video is not playing after unsorting
         else:
             QMessageBox.warning(self, "Error", "No videos to unsort.")
 
@@ -208,16 +226,13 @@ def ask_paths():
     
     keybindingConfigurator = KeybindingConfigurator()
     if keybindingConfigurator.exec_() == QDialog.Accepted:
-        core_buttons, folders_to_sort = keybindingConfigurator.getConfig()
-    else:
-        QMessageBox.warning(None, "Error", "Keybindings and folder mappings configuration cancelled.")
-        sys.exit()
-    
-    video_folder_path = QFileDialog.getExistingDirectory(None, "Select Unsorted Video Folder")
-    if video_folder_path:
+        video_folder_path, core_buttons, folders_to_sort = keybindingConfigurator.getConfig()
+        if not video_folder_path:
+            QMessageBox.warning(None, "Error", "Please enter the path for unsorted videos.")
+            sys.exit()
         return video_folder_path, core_buttons, folders_to_sort
     else:
-        QMessageBox.warning(None, "Error", "Please select the path for unsorted videos.")
+        QMessageBox.warning(None, "Error", "Keybindings and folder mappings configuration cancelled.")
         sys.exit()
 
 if __name__ == "__main__":
