@@ -10,7 +10,6 @@ This is a simple GUI application designed for sorting videos, compatible with bo
 
 ## Running the Application
 
-## TO BE ADDED
 ### As an Executable
 
 1. **Download the Executable:** Obtain the executable file suitable for your operating system. Ensure that the executable and the `video_sorter_keybinding.py` file are in the same directory.
