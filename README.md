@@ -1,6 +1,6 @@
 # Simple Video Sorter
 
-This is a simple GUI application designed for sorting videos, compatible with both Mac and Windows platforms. It offers a user-friendly interface to categorize your video files efficiently, making it an ideal tool for organizing videos for machine learning projects or personal use.
+This simple GUI is designed for sorting videos and is compatible with Mac and Windows platforms. It offers a user-friendly interface to categorize your video files efficiently, making it an ideal tool for organizing videos for machine learning projects or personal use.
 
 ## Features
 
@@ -23,7 +23,8 @@ If you prefer to run the application as a script, follow these steps:
     conda create --name your_env_name python=3.12.0
 2. **Install PyQt5:** Use pip to install the PyQt5 package required for the GUI:
     pip install PyQt5
-3. **Run the Script:** Navigate to the directory containing `simple_video_sorter.py` and execute the script:
+3. **Download script and keybindings:** Place them in the same directory
+4. **Run the Script:** Navigate to the directory and execute the script:
     python simple_video_sorter.py
 
 
