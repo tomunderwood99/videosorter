@@ -12,7 +12,7 @@ This is a simple GUI application designed for sorting videos, compatible with bo
 
 ### As an Executable
 
-1. **Download the Executable:** Obtain the executable file suitable for your operating system. Ensure that the executable and the `video_sorter_keybinding.py` file are in the same directory.
+1. **Download the Executable:** Download the executable file suitable for your operating system and the keybinding file. **Ensure that the executable and the `video_sorter_keybinding.py` file are in the same directory.**
 2. **Run the Application:** Launch the executable. Upon first run, you'll be prompted to input your desired keybindings, folders for sorting, and the path to the unsorted videos. These settings can be saved to the `video_sorter_keybinding.py` file for convenience in future uses.
 
 ### As a Script
