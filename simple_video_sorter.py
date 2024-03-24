@@ -1,8 +1,11 @@
 # May need to install GStreamer on Mac/Linux 
 # or K-Lite Codec Pack on Windows
 
-# to run as a script, create conda env with pyqt installed
-# seems to work best on Python 3.12.0
+# To run as script:
+# 1) create conda env using python 3.12.0 
+#    conda create --name your_env_name python=3.12.0
+# 2) install PyQt5 with pip
+#    pip install PyQt5
 
 import sys
 import os
