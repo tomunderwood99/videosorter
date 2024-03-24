@@ -245,6 +245,7 @@ class VideoPlayer(QWidget):
     def sort_video(self, folder_name):
         if self.current_video_index < len(self.video_files) and (self.isPlaying or self.player.state() == QMediaPlayer.PausedState):
             self.player.stop()
+            self.player.setMedia(QMediaContent())  # Release the file by setting the media to None
             self.isPlaying = False  # Update isPlaying since the video will stop
             source = os.path.join(self.video_folder_path, self.video_files[self.current_video_index])
             destination = self.folder_paths[folder_name]
